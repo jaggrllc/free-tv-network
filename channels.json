@@ -1,14 +1,14 @@
 [
   {
     "channel_number": 1,
-    "name": "Totally Radical Cartoons",
-    "topic": "80s cartoons",
-    "identifier": "popeye_popeye_for_president",
+    "name": "Totally Radical Movies",
+    "topic": "public domain",
+    "identifier": "Night.Of.The.Living.Dead_1080p",
     "videos": [
       {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": "7:30",
-        "title": "Popeye for President"
+        "url": "https://archive.org/download/Night.Of.The.Living.Dead_1080p/NightOfTheLivingDead_512kb.mp4",
+        "duration": "1:36:00",
+        "title": "Night of the Living Dead"
       }
     ]
   }
