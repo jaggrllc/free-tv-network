@@ -1,91 +1,82 @@
 #!/usr/bin/env python3
 """
 build_tv.py
-Searches Internet Archive for retro content and builds channels.json.
-Run: python build_tv.py
+Generates channels.json with 500 channels of public-domain / Archive.org MP4s.
 Requires: pip install internetarchive
+Run weekly via cron/GitHub Actions to refresh broken links.
 """
 import json
-import time
 import random
+import time
 from internetarchive import search_items, get_item
 
 TOPICS = [
-    "1990s anime", "skateboarding", "MTV music videos", "infomercials",
-    "sitcoms", "tech shows", "game shows", "extreme sports",
-    "public domain movies", "classic cartoons", "old commercials",
-    "educational film", "saturday morning", "vhs", "public domain"
+    "public domain cartoon", "Chavo del Ocho", "El Chavo", "Chapulin Colorado",
+    "professional wrestling 80s", "90s infomercial", "retro commercial",
+    "NASA space documentary", "public domain documentary", "Prelinger",
+    "1990s anime", "skateboarding 90s", "MTV music video", "90s sitcom",
+    "tech show 90s", "game show", "extreme sports 90s", "Spanish novela",
+    "wrestling NWA", "educational film", "industrial film", "home movie 80s",
+    "public domain western", "sci-fi public domain", "classic commercial"
 ]
 
-ADJECTIVES = ["Radical", "Totally", "Awesome", "Funky", "Groovy", "Tubular", "Wicked"]
-NOUNS = ["Zone", "Channel", "TV", "Network", "Theater", "Hour", "Blast"]
+COMMERCIAL_TOPICS = ["retro commercial", "infomercial 80s", "90s advertisement", "Prelinger commercial"]
 
-def make_name(topic):
-    return f"{random.choice(ADJECTIVES)} {random.choice(NOUNS)}: {topic.title()}"
-
-def get_good_mp4s(identifier, max_n=5):
+def find_mp4s(query, limit=30):
+    results = []
     try:
-        item = get_item(identifier)
-        videos = []
-        for f in item.files:
-            name = getattr(f, "name", "") or f.get("name", "")
-            fmt = (getattr(f, "format", "") or f.get("format", "")).lower()
-            size = int(getattr(f, "size", 0) or f.get("size", 0) or 0)
-            length = getattr(f, "length", None) or f.get("length", 0)
+        search = search_items(f'{query} mediatype:movies', fields=['identifier', 'title'])
+        for item in list(search)[:limit]:
             try:
-                dur = float(length) if length else 300
-            except:
-                dur = 300
-            if (size > 1_000_000 and name.lower().endswith(".mp4") and
-                any(x in fmt for x in ["h.264", "mpeg4", "512kb", "h264"])):
-                videos.append({
-                    "url": f"https://archive.org/download/{identifier}/{name}",
-                    "duration": int(dur),
-                    "title": name[:80]
-                })
-                if len(videos) >= max_n:
-                    break
-        return videos
+                ia_item = get_item(item['identifier'])
+                for f in ia_item.get_files(formats=['h.264', 'MPEG4', '512Kb MPEG4']):
+                    if f.name.lower().endswith('.mp4'):
+                        results.append({
+                            "title": item.get('title', item['identifier']),
+                            "url": f"https://archive.org/download/{item['identifier']}/{f.name}",
+                            "duration": 600  # placeholder; real duration requires probing or metadata
+                        })
+                        break
+            except Exception:
+                continue
+            if len(results) >= 8:
+                break
     except Exception as e:
-        print(f"  Skip {identifier}: {e}")
-        return []
+        print(f"Search failed for '{query}': {e}")
+    return results
 
-def build(num_channels=50):  # Start with 50; increase later
+def main():
+    all_videos = []
+    for topic in TOPICS:
+        print(f"Searching: {topic}")
+        vids = find_mp4s(topic)
+        all_videos.extend(vids)
+        time.sleep(1)
+
+    commercials = []
+    for topic in COMMERCIAL_TOPICS:
+        commercials.extend(find_mp4s(topic, limit=15))
+
+    # Build 500 channels
     channels = []
-    used = set()
-    print(f"Building up to {num_channels} channels...")
-
-    for topic in TOPICS * 10:  # Cycle topics
-        if len(channels) >= num_channels:
-            break
-        query = f"{topic} AND mediatype:movies"
-        print(f"Searching: {query}")
-        try:
-            results = search_items(query, fields=["identifier"], params={"rows": 40})
-            for result in results:
-                ident = result["identifier"]
-                if ident in used:
-                    continue
-                vids = get_good_mp4s(ident, 5)
-                if vids:
-                    channels.append({
-                        "channel_number": len(channels) + 1,
-                        "name": make_name(topic),
-                        "topic": topic,
-                        "videos": vids,
-                        "commercials": []  # Add real commercial URLs later
-                    })
-                    used.add(ident)
-                    print(f"  → Channel {len(channels)}: {ident} ({len(vids)} videos)")
-                    break
-            time.sleep(1.2)
-        except Exception as e:
-            print(f"Search error: {e}")
-            time.sleep(3)
+    for i in range(1, 501):
+        random.shuffle(all_videos)
+        playlist = random.sample(all_videos, min(5, len(all_videos)))
+        # Insert 60s commercial after each show
+        full_playlist = []
+        for v in playlist:
+            full_playlist.append(v)
+            if commercials:
+                full_playlist.append(random.choice(commercials) | {"duration": 60, "is_commercial": True})
+        channels.append({
+            "number": i,
+            "name": f"CH {i:03d} – {random.choice(['ToonTown', 'Nova TV', 'Lucha Libre', 'Infomercial Hour', 'Space Channel', 'Retro Hits', 'Documental', 'Wrestling Classic'])} {random.randint(1,99)}",
+            "playlist": full_playlist
+        })
 
     with open("channels.json", "w") as f:
         json.dump(channels, f, indent=2)
-    print(f"\nSaved {len(channels)} channels to channels.json")
+    print(f"Wrote {len(channels)} channels to channels.json")
 
 if __name__ == "__main__":
-    build(50)  # Change to 500 when ready (will take hours)
+    main()
