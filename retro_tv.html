@@ -31,7 +31,7 @@ button:hover { background: #0a7; }
 <body>
 <div class="tv-bezel">
   <div class="crt" id="crt">
-    <video id="player" playsinline></video>
+    <video id="player" playsinline preload="auto"></video>
     <canvas id="staticCanvas"></canvas>
     <div id="overlay" class="overlay"></div>
   </div>
@@ -55,6 +55,14 @@ const canvas = document.getElementById('staticCanvas');
 const ctx = canvas.getContext('2d');
 let channels = [], currentCh = 0, muted = false, surfTimer = null, titleTimeout = null, audioCtx;
 let isMaximized = false, lastTap = 0;
+
+// Hidden preloader for next video
+const nextVideo = document.createElement('video');
+nextVideo.preload = 'auto';
+nextVideo.muted = true;
+nextVideo.playsInline = true;
+nextVideo.style.display = 'none';
+document.body.appendChild(nextVideo);
 
 function updateClock() { clockEl.textContent = new Date().toLocaleTimeString(); }
 setInterval(updateClock, 1000); updateClock();
@@ -84,7 +92,6 @@ function showTitle(text) {
   titleTimeout = setTimeout(() => overlay.classList.remove('show'), 4000);
 }
 
-function getTotalDuration(ch) { return ch.videos.reduce((s, v) => s + (parseDuration(v.duration) || 600), 0); }
 function parseDuration(d) {
   if (!d) return 600;
   const parts = d.split(':').map(Number);
@@ -92,6 +99,8 @@ function parseDuration(d) {
   if (parts.length === 2) return parts[0]*60 + parts[1];
   return parseInt(d) || 600;
 }
+
+function getTotalDuration(ch) { return ch.videos.reduce((s, v) => s + parseDuration(v.duration), 0); }
 
 function syncToClock(ch) {
   const total = getTotalDuration(ch);
@@ -105,6 +114,36 @@ function syncToClock(ch) {
   return { index: 0, time: 0 };
 }
 
+function preloadNext(ch, nextIdx) {
+  if (nextIdx >= ch.videos.length) nextIdx = 0;
+  const nextItem = ch.videos[nextIdx];
+  if (nextItem && nextItem.url) {
+    nextVideo.src = nextItem.url;
+    nextVideo.load();
+  }
+}
+
+function playItem(ch, idx, seek = 0) {
+  if (idx >= ch.videos.length) idx = 0;
+  const item = ch.videos[idx];
+
+  video.preload = 'auto';
+  video.src = item.url;
+  video.load();
+
+  const onMeta = () => {
+    video.currentTime = Math.min(seek, (video.duration || seek) - 0.5);
+    video.play().catch(() => {});
+    video.removeEventListener('loadedmetadata', onMeta);
+  };
+  video.addEventListener('loadedmetadata', onMeta);
+
+  preloadNext(ch, idx + 1);
+
+  video.onended = () => playItem(ch, idx + 1);
+  video.onerror = () => playItem(ch, idx + 1);
+}
+
 function loadChannel(n) {
   if (n < 0 || n >= channels.length) return;
   currentCh = n;
@@ -114,16 +153,6 @@ function loadChannel(n) {
   const { index, time } = syncToClock(ch);
   playItem(ch, index, time);
   document.querySelectorAll('.ch-cell').forEach((c, i) => c.classList.toggle('active', i === n));
-}
-
-function playItem(ch, idx, seek = 0) {
-  if (idx >= ch.videos.length) idx = 0;
-  const item = ch.videos[idx];
-  video.src = item.url;
-  video.currentTime = seek;
-  video.play().catch(() => {});
-  video.onended = () => playItem(ch, idx + 1);
-  video.onerror = () => playItem(ch, idx + 1);
 }
 
 function toggleMaximize() {
@@ -154,6 +183,15 @@ document.addEventListener('fullscreenchange', () => {
 });
 document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) { crt.classList.remove('maximized'); isMaximized = false; }
+});
+
+// Buffering indicator
+video.addEventListener('waiting', () => {
+  overlay.textContent = 'Buffering...';
+  overlay.classList.add('show');
+});
+video.addEventListener('playing', () => {
+  if (overlay.textContent === 'Buffering...') overlay.classList.remove('show');
 });
 
 async function init() {
