@@ -2,132 +2,79 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Free TV Network — 90s Cable</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRO CABLE TV – 1990s Spelunkr Clone</title>
 <style>
-  body { margin:0; background:#111; font-family: monospace; color:#0f0; display:flex; flex-direction:column; align-items:center; min-height:100vh; }
-  .tv-bezel { background: linear-gradient(145deg, #8B4513, #D2691E, #A0522D); padding: 30px 40px 50px; border-radius: 40px 40px 20px 20px; box-shadow: 0 0 40px #000, inset 0 0 20px #000; position:relative; }
-  .screen { background:#000; width: 720px; height: 405px; border-radius: 12px; overflow:hidden; position:relative; box-shadow: inset 0 0 30px #000; }
-  video { width:100%; height:100%; object-fit:contain; background:#000; }
-  #static { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none; }
-  .overlay { position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); padding:8px 12px; border-radius:6px; font-size:18px; color:#0f0; text-shadow:0 0 5px #0f0; }
-  .controls { margin-top:15px; display:flex; gap:20px; align-items:center; }
-  .knob { width:50px; height:50px; border-radius:50%; background:radial-gradient(circle, #ccc, #666); border:4px solid #333; cursor:pointer; position:relative; }
-  .power { background:radial-gradient(circle, #f00, #800); }
-  .guide { margin-top:20px; width:800px; max-height:200px; overflow:auto; background:#000; border:2px solid #0f0; padding:10px; font-size:14px; }
-  .ch-btn { background:#222; color:#0f0; border:1px solid #0f0; padding:8px 16px; margin:0 5px; cursor:pointer; }
-  .instructions { margin-top:30px; max-width:800px; color:#aaa; font-size:13px; line-height:1.5; }
+:root { --crt: #0a0; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #111; color: #eee; font-family: 'Courier New', monospace; overflow: hidden; }
+.tv-bezel { width: 100vw; height: 100vh; background: linear-gradient(145deg,#2a2a2a,#111); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.crt { width: min(92vw, 1280px); aspect-ratio: 16/9; background: #000; border-radius: 20px; box-shadow: inset 0 0 80px #000, 0 0 40px #000; position: relative; overflow: hidden; }
+.crt.collapse { animation: collapse 0.6s forwards; }
+@keyframes collapse { to { transform: scaleY(0.02) scaleX(0.8); filter: brightness(2); } }
+video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#staticCanvas { position: absolute; inset: 0; pointer-events: none; display: none; }
+.overlay { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); padding: 8px 20px; border-radius: 6px; font-size: 1.3rem; opacity: 0; transition: opacity .4s; z-index: 10; }
+.overlay.show { opacity: 1; }
+.clock { margin-top: 10px; font-size: 1.6rem; color: var(--crt); text-shadow: 0 0 8px var(--crt); }
+.remote { display: flex; gap: 12px; margin: 10px 0; }
+button { background: #333; color: #fff; border: 2px solid #555; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-family: inherit; }
+button:hover { background: #0a7; }
+.guide { width: 100%; max-height: 28vh; overflow-y: auto; background: #000c; border-top: 2px solid #333; }
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px; padding: 8px; }
+.ch-cell { background: #222; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+.ch-cell:hover, .ch-cell.active { background: #0a7; }
+/* Hosting instructions – visible only in source / console for operators */
+/* HOSTING: Deploy to GitHub Pages, Netlify, or Streamlit Cloud. Place channels.json next to this file. No local server needed once hosted. */
 </style>
 </head>
 <body>
 <div class="tv-bezel">
-  <div class="screen" id="screen">
-    <video id="vid" playsinline></video>
-    <canvas id="static"></canvas>
-    <div class="overlay" id="osd">CH 001 — Totally Radical Zone</div>
+  <div class="crt" id="crt">
+    <video id="player" playsinline></video>
+    <canvas id="staticCanvas"></canvas>
+    <div id="overlay" class="overlay"></div>
   </div>
-  <div class="controls">
-    <button class="ch-btn" onclick="changeChannel(-1)">CH ▼</button>
-    <button class="ch-btn" onclick="changeChannel(1)">CH ▲</button>
-    <div class="knob" title="Channel" onclick="changeChannel(1)"></div>
-    <div class="knob power" title="Power" onclick="togglePower()"></div>
-    <button class="ch-btn" onclick="toggleMute()">MUTE</button>
-    <button class="ch-btn" onclick="autoSurf()">AUTO-SURF 15s</button>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="remote">
+    <button id="chDown">CH ▼</button>
+    <button id="chUp">CH ▲</button>
+    <button id="muteBtn">MUTE</button>
+    <button id="surfBtn">AUTO-SURF 15s</button>
   </div>
-</div>
-
-<div class="guide" id="guide"></div>
-
-<div class="instructions">
-  <strong>Host instructions (viewers never see this):</strong><br>
-  1. Put retro_tv.html + channels.json in a folder.<br>
-  2. Run: <code>python -m http.server 8000</code><br>
-  3. Open http://localhost:8000/retro_tv.html<br>
-  Free hosting: Upload both files to GitHub Pages, Netlify, or Cloudflare Pages. No server needed beyond static hosting.
+  <div class="guide">
+    <div class="guide-grid" id="guide"></div>
+  </div>
 </div>
 
 <script>
+const video = document.getElementById('player');
+const overlay = document.getElementById('overlay');
+const clockEl = document.getElementById('clock');
+const crt = document.getElementById('crt');
+const canvas = document.getElementById('staticCanvas');
+const ctx = canvas.getContext('2d');
 let channels = [];
 let currentCh = 0;
-let powerOn = true;
 let muted = false;
-let keyBuffer = "";
-let keyTimer = null;
-let autoSurfTimer = null;
+let surfTimer = null;
+let titleTimeout = null;
+let audioCtx, noiseNode;
 
-const vid = document.getElementById("vid");
-const osd = document.getElementById("osd");
-const staticCanvas = document.getElementById("static");
-const ctx = staticCanvas.getContext("2d");
-
-async function loadChannels() {
-  try {
-    const res = await fetch("channels.json");
-    channels = await res.json();
-    buildGuide();
-    playCurrent();
-  } catch (e) {
-    osd.textContent = "channels.json not found — run local server";
-  }
+// Clock
+function updateClock() {
+  clockEl.textContent = new Date().toLocaleTimeString();
 }
+setInterval(updateClock, 1000);
+updateClock();
 
-function buildGuide() {
-  const g = document.getElementById("guide");
-  g.innerHTML = channels.map(c => 
-    `<div style="cursor:pointer" onclick="jumpTo(${c.channel_number})">CH ${String(c.channel_number).padStart(3,'0')} — ${c.name}</div>`
-  ).join("");
-}
-
-function getPlaylist(ch) {
-  const c = channels[ch];
-  const pl = [];
-  (c.videos || []).forEach(v => pl.push({...v, type:"show"}));
-  // Insert 60s commercial after every show
-  if (c.commercials && c.commercials.length) {
-    const com = c.commercials[0];
-    pl.push({...com, type:"commercial", duration:60});
-  }
-  return pl.length ? pl : [{url: "", duration: 10, title: "No signal"}];
-}
-
-function playCurrent() {
-  if (!powerOn || !channels.length) return;
-  const ch = channels[currentCh];
-  const pl = getPlaylist(currentCh);
-  const total = pl.reduce((s, p) => s + (p.duration || 30), 0);
-  const now = Math.floor(Date.now() / 1000);
-  let pos = now % total;
-  let i = 0;
-  for (; i < pl.length; i++) {
-    if (pos < (pl[i].duration || 30)) break;
-    pos -= (pl[i].duration || 30);
-  }
-  const item = pl[i];
-  osd.textContent = `CH ${String(ch.channel_number).padStart(3,'0')} — ${ch.name}`;
-  if (item.type === "commercial") osd.textContent += " [AD]";
-  vid.src = item.url;
-  vid.currentTime = pos;
-  vid.play().catch(()=>{});
-  vid.onerror = () => { changeChannel(1); }; // failover
-}
-
-function changeChannel(delta) {
-  if (!channels.length) return;
-  currentCh = (currentCh + delta + channels.length) % channels.length;
-  playStatic();
-  setTimeout(playCurrent, 350);
-}
-
-function jumpTo(num) {
-  const idx = channels.findIndex(c => c.channel_number === num);
-  if (idx >= 0) { currentCh = idx; playStatic(); setTimeout(playCurrent, 350); }
-}
-
+// Static snow + noise
 function playStatic() {
-  staticCanvas.style.display = "block";
-  staticCanvas.width = staticCanvas.offsetWidth;
-  staticCanvas.height = staticCanvas.offsetHeight;
+  canvas.style.display = 'block';
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
   const id = setInterval(() => {
-    const img = ctx.createImageData(staticCanvas.width, staticCanvas.height);
+    const img = ctx.createImageData(canvas.width, canvas.height);
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() * 255;
       img.data[i] = img.data[i+1] = img.data[i+2] = v;
@@ -135,56 +82,122 @@ function playStatic() {
     }
     ctx.putImageData(img, 0, 0);
   }, 50);
-  // White noise (simple)
-  const actx = new (window.AudioContext || window.webkitAudioContext)();
-  const buffer = actx.createBuffer(1, actx.sampleRate * 0.35, actx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const src = actx.createBufferSource();
-  src.buffer = buffer;
-  src.connect(actx.destination);
-  src.start();
-  setTimeout(() => { clearInterval(id); staticCanvas.style.display = "none"; }, 350);
+  setTimeout(() => { clearInterval(id); canvas.style.display = 'none'; }, 350);
+
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const bufferSize = 2 * audioCtx.sampleRate;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const output = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  noise.connect(audioCtx.destination);
+  noise.start();
+  setTimeout(() => noise.stop(), 350);
 }
 
-function togglePower() {
-  powerOn = !powerOn;
-  const screen = document.getElementById("screen");
-  if (!powerOn) {
-    screen.style.transform = "scaleY(0.05)";
-    screen.style.transition = "transform 0.4s";
-    vid.pause();
-  } else {
-    screen.style.transform = "scaleY(1)";
-    playCurrent();
+function showTitle(text) {
+  overlay.textContent = text;
+  overlay.classList.add('show');
+  clearTimeout(titleTimeout);
+  titleTimeout = setTimeout(() => overlay.classList.remove('show'), 4000);
+}
+
+function getTotalDuration(ch) {
+  return ch.playlist.reduce((s, v) => s + (v.duration || 600), 0);
+}
+
+function syncToClock(ch) {
+  const total = getTotalDuration(ch);
+  const now = Date.now() / 1000;
+  const offset = now % total;
+  let acc = 0;
+  for (let i = 0; i < ch.playlist.length; i++) {
+    const d = ch.playlist[i].duration || 600;
+    if (acc + d > offset) {
+      return { index: i, time: offset - acc };
+    }
+    acc += d;
   }
+  return { index: 0, time: 0 };
 }
 
-function toggleMute() { muted = !muted; vid.muted = muted; }
-
-function autoSurf() {
-  if (autoSurfTimer) clearInterval(autoSurfTimer);
-  autoSurfTimer = setInterval(() => changeChannel(1), 15000);
-  setTimeout(() => clearInterval(autoSurfTimer), 15000);
+function loadChannel(n, fromKeypad = false) {
+  if (n < 0 || n >= channels.length) return;
+  currentCh = n;
+  playStatic();
+  const ch = channels[n];
+  showTitle(`You're watching ${ch.name}`);
+  const { index, time } = syncToClock(ch);
+  playItem(ch, index, time);
+  document.querySelectorAll('.ch-cell').forEach((c, i) => c.classList.toggle('active', i === n));
+  if (!fromKeypad) crt.classList.remove('collapse');
 }
+
+function playItem(ch, idx, seek = 0) {
+  if (idx >= ch.playlist.length) idx = 0;
+  const item = ch.playlist[idx];
+  video.src = item.url;
+  video.currentTime = seek;
+  video.play().catch(() => {});
+  video.onended = () => playItem(ch, idx + 1);
+  video.onerror = () => {
+    console.warn('Broken link, skipping');
+    playItem(ch, idx + 1);
+  };
+}
+
+async function init() {
+  try {
+    const res = await fetch('./channels.json');
+    channels = await res.json();
+  } catch (e) {
+    // Fallback sample if no JSON
+    channels = [{ number: 1, name: "CH 001 – Demo ToonTown", playlist: [
+      { title: "Sample", url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", duration: 600 }
+    ]}];
+  }
+  const guide = document.getElementById('guide');
+  channels.forEach((ch, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ch-cell';
+    cell.textContent = `${String(ch.number).padStart(3,'0')} ${ch.name}`;
+    cell.onclick = () => loadChannel(i);
+    guide.appendChild(cell);
+  });
+  loadChannel(0);
+}
+
+// Controls
+document.getElementById('chUp').onclick = () => loadChannel((currentCh + 1) % channels.length);
+document.getElementById('chDown').onclick = () => loadChannel((currentCh - 1 + channels.length) % channels.length);
+document.getElementById('muteBtn').onclick = () => { muted = !muted; video.muted = muted; };
+document.getElementById('surfBtn').onclick = () => {
+  if (surfTimer) { clearInterval(surfTimer); surfTimer = null; return; }
+  surfTimer = setInterval(() => loadChannel((currentCh + 1) % channels.length), 15000);
+};
 
 // Keyboard
-document.addEventListener("keydown", e => {
-  if (e.key === "ArrowUp") changeChannel(1);
-  if (e.key === "ArrowDown") changeChannel(-1);
-  if (e.key === "m") toggleMute();
-  if (/[0-9]/.test(e.key)) {
-    keyBuffer += e.key;
-    clearTimeout(keyTimer);
-    keyTimer = setTimeout(() => {
-      if (keyBuffer.length === 3) jumpTo(parseInt(keyBuffer, 10));
-      keyBuffer = "";
-    }, 1000);
+let keypad = '';
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowUp') loadChannel((currentCh + 1) % channels.length);
+  if (e.key === 'ArrowDown') loadChannel((currentCh - 1 + channels.length) % channels.length);
+  if (e.key === 'm' || e.key === 'M') { muted = !muted; video.muted = muted; }
+  if (e.key >= '0' && e.key <= '9') {
+    keypad += e.key;
+    if (keypad.length === 3) {
+      const num = parseInt(keypad, 10);
+      const idx = channels.findIndex(c => c.number === num);
+      if (idx !== -1) loadChannel(idx, true);
+      keypad = '';
+    }
   }
 });
 
-loadChannels();
-setInterval(playCurrent, 10000); // keep live sync
+// CRT collapse on power (optional)
+// setTimeout(() => crt.classList.add('collapse'), 30000); // demo
+
+init();
 </script>
 </body>
 </html>
