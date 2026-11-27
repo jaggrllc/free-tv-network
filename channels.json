@@ -1,14 +1,15 @@
 [
   {
-    "title": "Big Buck Bunny",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-  },
-  {
-    "title": "Elephant Dream",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-  },
-  {
-    "title": "Sintel",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+    "channel_number": 1,
+    "name": "Totally Radical Movies",
+    "topic": "public domain",
+    "identifier": "Night.Of.The.Living.Dead_1080p",
+    "videos": [
+      {
+        "url": "https://archive.org/download/Night.Of.The.Living.Dead_1080p/NightOfTheLivingDead_512kb.mp4",
+        "duration": "1:36:00",
+        "title": "Night of the Living Dead"
+      }
+    ]
   }
 ]
