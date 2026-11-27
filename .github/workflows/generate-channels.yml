@@ -1,13 +1,13 @@
 name: Generate channels.json
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # Lets you start it manually from the GitHub website
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write   # Needed so it can commit the JSON file
 
     steps:
       - name: Checkout repo
