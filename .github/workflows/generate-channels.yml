@@ -1,5 +1,3 @@
-.github/workflows/generate-channels.yml
-
 name: Generate channels.json
 
 on:
