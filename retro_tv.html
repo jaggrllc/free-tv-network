@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Free TV Network — 90s Cable</title>
+<style>
+  body { margin:0; background:#111; font-family: monospace; color:#0f0; display:flex; flex-direction:column; align-items:center; min-height:100vh; }
+  .tv-bezel { background: linear-gradient(145deg, #8B4513, #D2691E, #A0522D); padding: 30px 40px 50px; border-radius: 40px 40px 20px 20px; box-shadow: 0 0 40px #000, inset 0 0 20px #000; position:relative; }
+  .screen { background:#000; width: 720px; height: 405px; border-radius: 12px; overflow:hidden; position:relative; box-shadow: inset 0 0 30px #000; }
+  video { width:100%; height:100%; object-fit:contain; background:#000; }
+  #static { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none; }
+  .overlay { position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.7); padding:8px 12px; border-radius:6px; font-size:18px; color:#0f0; text-shadow:0 0 5px #0f0; }
+  .controls { margin-top:15px; display:flex; gap:20px; align-items:center; }
+  .knob { width:50px; height:50px; border-radius:50%; background:radial-gradient(circle, #ccc, #666); border:4px solid #333; cursor:pointer; position:relative; }
+  .power { background:radial-gradient(circle, #f00, #800); }
+  .guide { margin-top:20px; width:800px; max-height:200px; overflow:auto; background:#000; border:2px solid #0f0; padding:10px; font-size:14px; }
+  .ch-btn { background:#222; color:#0f0; border:1px solid #0f0; padding:8px 16px; margin:0 5px; cursor:pointer; }
+  .instructions { margin-top:30px; max-width:800px; color:#aaa; font-size:13px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="tv-bezel">
+  <div class="screen" id="screen">
+    <video id="vid" playsinline></video>
+    <canvas id="static"></canvas>
+    <div class="overlay" id="osd">CH 001 — Totally Radical Zone</div>
+  </div>
+  <div class="controls">
+    <button class="ch-btn" onclick="changeChannel(-1)">CH ▼</button>
+    <button class="ch-btn" onclick="changeChannel(1)">CH ▲</button>
+    <div class="knob" title="Channel" onclick="changeChannel(1)"></div>
+    <div class="knob power" title="Power" onclick="togglePower()"></div>
+    <button class="ch-btn" onclick="toggleMute()">MUTE</button>
+    <button class="ch-btn" onclick="autoSurf()">AUTO-SURF 15s</button>
+  </div>
+</div>
+
+<div class="guide" id="guide"></div>
+
+<div class="instructions">
+  <strong>Host instructions (viewers never see this):</strong><br>
+  1. Put retro_tv.html + channels.json in a folder.<br>
+  2. Run: <code>python -m http.server 8000</code><br>
+  3. Open http://localhost:8000/retro_tv.html<br>
+  Free hosting: Upload both files to GitHub Pages, Netlify, or Cloudflare Pages. No server needed beyond static hosting.
+</div>
+
+<script>
+let channels = [];
+let currentCh = 0;
+let powerOn = true;
+let muted = false;
+let keyBuffer = "";
+let keyTimer = null;
+let autoSurfTimer = null;
+
+const vid = document.getElementById("vid");
+const osd = document.getElementById("osd");
+const staticCanvas = document.getElementById("static");
+const ctx = staticCanvas.getContext("2d");
+
+async function loadChannels() {
+  try {
+    const res = await fetch("channels.json");
+    channels = await res.json();
+    buildGuide();
+    playCurrent();
+  } catch (e) {
+    osd.textContent = "channels.json not found — run local server";
+  }
+}
+
+function buildGuide() {
+  const g = document.getElementById("guide");
+  g.innerHTML = channels.map(c => 
+    `<div style="cursor:pointer" onclick="jumpTo(${c.channel_number})">CH ${String(c.channel_number).padStart(3,'0')} — ${c.name}</div>`
+  ).join("");
+}
+
+function getPlaylist(ch) {
+  const c = channels[ch];
+  const pl = [];
+  (c.videos || []).forEach(v => pl.push({...v, type:"show"}));
+  // Insert 60s commercial after every show
+  if (c.commercials && c.commercials.length) {
+    const com = c.commercials[0];
+    pl.push({...com, type:"commercial", duration:60});
+  }
+  return pl.length ? pl : [{url: "", duration: 10, title: "No signal"}];
+}
+
+function playCurrent() {
+  if (!powerOn || !channels.length) return;
+  const ch = channels[currentCh];
+  const pl = getPlaylist(currentCh);
+  const total = pl.reduce((s, p) => s + (p.duration || 30), 0);
+  const now = Math.floor(Date.now() / 1000);
+  let pos = now % total;
+  let i = 0;
+  for (; i < pl.length; i++) {
+    if (pos < (pl[i].duration || 30)) break;
+    pos -= (pl[i].duration || 30);
+  }
+  const item = pl[i];
+  osd.textContent = `CH ${String(ch.channel_number).padStart(3,'0')} — ${ch.name}`;
+  if (item.type === "commercial") osd.textContent += " [AD]";
+  vid.src = item.url;
+  vid.currentTime = pos;
+  vid.play().catch(()=>{});
+  vid.onerror = () => { changeChannel(1); }; // failover
+}
+
+function changeChannel(delta) {
+  if (!channels.length) return;
+  currentCh = (currentCh + delta + channels.length) % channels.length;
+  playStatic();
+  setTimeout(playCurrent, 350);
+}
+
+function jumpTo(num) {
+  const idx = channels.findIndex(c => c.channel_number === num);
+  if (idx >= 0) { currentCh = idx; playStatic(); setTimeout(playCurrent, 350); }
+}
+
+function playStatic() {
+  staticCanvas.style.display = "block";
+  staticCanvas.width = staticCanvas.offsetWidth;
+  staticCanvas.height = staticCanvas.offsetHeight;
+  const id = setInterval(() => {
+    const img = ctx.createImageData(staticCanvas.width, staticCanvas.height);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255;
+      img.data[i] = img.data[i+1] = img.data[i+2] = v;
+      img.data[i+3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, 50);
+  // White noise (simple)
+  const actx = new (window.AudioContext || window.webkitAudioContext)();
+  const buffer = actx.createBuffer(1, actx.sampleRate * 0.35, actx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = actx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(actx.destination);
+  src.start();
+  setTimeout(() => { clearInterval(id); staticCanvas.style.display = "none"; }, 350);
+}
+
+function togglePower() {
+  powerOn = !powerOn;
+  const screen = document.getElementById("screen");
+  if (!powerOn) {
+    screen.style.transform = "scaleY(0.05)";
+    screen.style.transition = "transform 0.4s";
+    vid.pause();
+  } else {
+    screen.style.transform = "scaleY(1)";
+    playCurrent();
+  }
+}
+
+function toggleMute() { muted = !muted; vid.muted = muted; }
+
+function autoSurf() {
+  if (autoSurfTimer) clearInterval(autoSurfTimer);
+  autoSurfTimer = setInterval(() => changeChannel(1), 15000);
+  setTimeout(() => clearInterval(autoSurfTimer), 15000);
+}
+
+// Keyboard
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") changeChannel(1);
+  if (e.key === "ArrowDown") changeChannel(-1);
+  if (e.key === "m") toggleMute();
+  if (/[0-9]/.test(e.key)) {
+    keyBuffer += e.key;
+    clearTimeout(keyTimer);
+    keyTimer = setTimeout(() => {
+      if (keyBuffer.length === 3) jumpTo(parseInt(keyBuffer, 10));
+      keyBuffer = "";
+    }, 1000);
+  }
+});
+
+loadChannels();
+setInterval(playCurrent, 10000); // keep live sync
+</script>
+</body>
+</html>
