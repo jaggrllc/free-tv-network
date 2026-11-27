@@ -12,9 +12,9 @@
     ],
     "commercials": [
       {
-        "url": "https://archive.org/download/ClassicCommercials/classic_commercial_1.mp4",
-        "duration": 60,
-        "title": "90s Ad"
+          "url": "https://archive.org/01-public-access-news-report/01 Public Access News Report.ia.mp4",
+          "duration": 183,
+          "title": "Public Access TV News Report - The New York TV Archive - Part 2 (2022)",
       }
     ]
   },
