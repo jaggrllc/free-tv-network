@@ -1,15 +1,34 @@
 [
   {
     "channel_number": 1,
-    "name": "Totally Radical Movies",
-    "topic": "public domain",
-    "identifier": "Night.Of.The.Living.Dead_1080p",
+    "name": "Totally Radical Zone",
+    "topic": "public domain movies",
     "videos": [
       {
         "url": "https://archive.org/download/Night.Of.The.Living.Dead_1080p/NightOfTheLivingDead_512kb.mp4",
-        "duration": "1:36:00",
+        "duration": 5760,
         "title": "Night of the Living Dead"
       }
+    ],
+    "commercials": [
+      {
+        "url": "https://archive.org/download/ClassicCommercials/classic_commercial_1.mp4",
+        "duration": 60,
+        "title": "90s Ad"
+      }
     ]
+  },
+  {
+    "channel_number": 2,
+    "name": "Groovy Cartoon Hour",
+    "topic": "classic cartoons",
+    "videos": [
+      {
+        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
+        "duration": 450,
+        "title": "Popeye"
+      }
+    ],
+    "commercials": []
   }
 ]
