@@ -1,28 +1,10 @@
+[
+  {
     "channel_number": 1,
     "name": "Totally Radical Cartoons",
     "topic": "80s cartoons",
-    "identifier": "example",
+    "identifier": "popeye_popeye_for_president",
     "videos": [
-      {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": "7:30",
-        "title": "Popeye for President"
-      },
-      {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": "7:30",
-        "title": "Popeye for President"
-      },
-      {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": "7:30",
-        "title": "Popeye for President"
-      },
-      {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": "7:30",
-        "title": "Popeye for President"
-      },
       {
         "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
         "duration": "7:30",
