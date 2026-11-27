@@ -214,3 +214,34 @@ loadChannels();
 components.html(html_code, height=950, scrolling=True)
 
 st.caption("Channel title shows for 15 seconds after activation. Clock shows your local time. Channels loaded from GitHub.")
+
+Example channels.json (upload to your GitHub repo)
+json
+
+[
+  {
+    "title": "Big Buck Bunny",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+  },
+  {
+    "title": "Elephant Dream",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+  },
+  {
+    "title": "Sintel",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+  },
+  {
+    "title": "Tears of Steel",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
+  }
+]
+
+Steps
+
+    Add app.py and channels.json to your public GitHub repo.
+    Update the CHANNELS_JSON_URL line in app.py to the raw URL of your channels.json (click the file on GitHub → Raw → copy the URL).
+    Deploy / redeploy on Streamlit Community Cloud (linked to the same repo).
+
+The player will fetch the JSON at runtime, show the channel title for 15 seconds on activation, and keep the centered local-time clock below the TV. No local computer needed.
+
