@@ -1,247 +1,173 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="TV Channel Player", layout="wide")
+st.set_page_config(page_title="Retro Cable TV", layout="wide")
 
-st.title("TV Channel MP4 Player")
+# Replace with your raw GitHub URL for channels.json
+CHANNELS_JSON_URL = "https://raw.githubusercontent.com/jaggrllc/free-tv-network/main/channels.json"
 
-html_code = """
+html = f"""
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRO CABLE TV</title>
 <style>
-  body { background: #111; color: #eee; font-family: system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-  .tv { background: linear-gradient(145deg, #2a2a2a, #1a1a1a); border-radius: 18px; padding: 22px 22px 28px; box-shadow: 0 10px 40px rgba(0,0,0,.7), inset 0 0 0 4px #444; }
-  .screen { position: relative; width: min(90vw, 800px); aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
-  video { width: 100%; height: 100%; object-fit: contain; }
-  .channel-title { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 1.4rem; font-weight: 600; opacity: 0; transition: opacity 0.4s; pointer-events: none; z-index: 10; }
-  .channel-title.visible { opacity: 1; }
-  .clock { font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: bold; color: #0f0; background: #000; padding: 6px 18px; border-radius: 6px; border: 2px solid #333; margin-top: 12px; letter-spacing: 2px; text-align: center; }
-  .channels { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
-  .ch-btn { background: #333; color: #fff; border: 1px solid #555; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
-  .ch-btn:hover, .ch-btn.active { background: #0a7; }
+:root {{ --crt: #0a0; }}
+* {{ box-sizing: border-box; }}
+body {{ margin: 0; background: #111; color: #eee; font-family: 'Courier New', monospace; }}
+.tv-bezel {{ width: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px; }}
+.crt {{ width: min(95vw, 1100px); aspect-ratio: 16/9; background: #000; border-radius: 18px; box-shadow: inset 0 0 60px #000, 0 0 30px #000; position: relative; overflow: hidden; }}
+video {{ width: 100%; height: 100%; object-fit: contain; }}
+#staticCanvas {{ position: absolute; inset: 0; pointer-events: none; display: none; }}
+.overlay {{ position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.8); padding: 8px 20px; border-radius: 6px; font-size: 1.2rem; opacity: 0; transition: opacity .4s; z-index: 10; }}
+.overlay.show {{ opacity: 1; }}
+.clock {{ margin-top: 8px; font-size: 1.5rem; color: var(--crt); text-shadow: 0 0 8px var(--crt); }}
+.remote {{ display: flex; gap: 10px; margin: 8px 0; flex-wrap: wrap; justify-content: center; }}
+button {{ background: #333; color: #fff; border: 2px solid #555; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; }}
+button:hover {{ background: #0a7; }}
+.guide {{ width: 100%; max-height: 25vh; overflow-y: auto; background: #000c; border-top: 2px solid #333; margin-top: 6px; }}
+.guide-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px; padding: 6px; }}
+.ch-cell {{ background: #222; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }}
+.ch-cell:hover, .ch-cell.active {{ background: #0a7; }}
 </style>
 </head>
 <body>
-  <div class="tv">
-    <div class="screen">
-      <video id="player" playsinline controls></video>
-      <div id="titleOverlay" class="channel-title"></div>
-    </div>
+<div class="tv-bezel">
+  <div class="crt" id="crt">
+    <video id="player" playsinline></video>
+    <canvas id="staticCanvas"></canvas>
+    <div id="overlay" class="overlay"></div>
   </div>
-  <div id="clock" class="clock">--:--:--</div>
-  <div class="channels" id="channelButtons"></div>
-
-<script>
-const channels = [
-  { title: "Big Buck Bunny", src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-  { title: "Elephant Dream", src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-  { title: "Sintel", src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
-  { title: "Tears of Steel", src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" }
-];
-
-const video = document.getElementById('player');
-const titleOverlay = document.getElementById('titleOverlay');
-const clockEl = document.getElementById('clock');
-const buttonsContainer = document.getElementById('channelButtons');
-let titleTimeout = null;
-let currentIndex = -1;
-
-function updateClock() {
-  clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-function showTitle(title) {
-  titleOverlay.textContent = title;
-  titleOverlay.classList.add('visible');
-  clearTimeout(titleTimeout);
-  titleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 15000);
-}
-
-function activateChannel(index) {
-  if (index === currentIndex) return;
-  currentIndex = index;
-  const ch = channels[index];
-  video.src = ch.src;
-  video.load();
-  video.play().catch(() => {});
-  showTitle(ch.title);
-  document.querySelectorAll('.ch-btn').forEach((btn, i) => btn.classList.toggle('active', i === index));
-}
-
-channels.forEach((ch, i) => {
-  const btn = document.createElement('button');
-  btn.className = 'ch-btn';
-  btn.textContent = `CH ${i + 1}: ${ch.title}`;
-  btn.onclick = () => activateChannel(i);
-  buttonsContainer.appendChild(btn);
-});
-</script>
-</body>
-</html>
-"""
-
-components.html(html_code, height=900, scrolling=True)
-
-st.caption("Channel title appears for 15 seconds after activation. Clock shows your local time.")
-
-Deployment steps (GitHub + Streamlit Cloud only)
-
-    Create a new public GitHub repository.
-    Add the file above as app.py (and a simple requirements.txt containing just streamlit).
-    Go to share.streamlit.io, sign in with GitHub, and deploy the repo.
-    Streamlit Cloud gives you a public URL. The player (with temporary channel titles and the centered local-time clock) runs entirely in the cloud.
-
-You can later replace the hard-coded channel list with a channels.json fetched from the same repo or any public URL.
-
-Want me to adjust the layout, add more channels, or switch to loading from an external JSON?
-Switch to loading from a JSON histed on GitHub.
-
-Updated app.py — loads channels from a JSON file hosted on GitHub (raw URL).
-
-Replace YOUR_USERNAME and YOUR_REPO with your actual GitHub details (or any public raw URL).
-python
-
-import streamlit as st
-import streamlit.components.v1 as components
-
-st.set_page_config(page_title="TV Channel Player", layout="wide")
-
-st.title("TV Channel MP4 Player")
-
-# Change this to your raw GitHub URL for channels.json
-CHANNELS_JSON_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json"
-
-html_code = f"""
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-  body {{ background: #111; color: #eee; font-family: system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; padding: 20px; }}
-  .tv {{ background: linear-gradient(145deg, #2a2a2a, #1a1a1a); border-radius: 18px; padding: 22px 22px 28px; box-shadow: 0 10px 40px rgba(0,0,0,.7), inset 0 0 0 4px #444; }}
-  .screen {{ position: relative; width: min(90vw, 800px); aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }}
-  video {{ width: 100%; height: 100%; object-fit: contain; }}
-  .channel-title {{ position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.75); color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 1.4rem; font-weight: 600; opacity: 0; transition: opacity 0.4s; pointer-events: none; z-index: 10; }}
-  .channel-title.visible {{ opacity: 1; }}
-  .clock {{ font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: bold; color: #0f0; background: #000; padding: 6px 18px; border-radius: 6px; border: 2px solid #333; margin-top: 12px; letter-spacing: 2px; text-align: center; }}
-  .channels {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }}
-  .ch-btn {{ background: #333; color: #fff; border: 1px solid #555; padding: 10px 16px; border-radius: 6px; cursor: pointer; }}
-  .ch-btn:hover, .ch-btn.active {{ background: #0a7; }}
-  .status {{ color: #fa0; margin-top: 10px; }}
-</style>
-</head>
-<body>
-  <div class="tv">
-    <div class="screen">
-      <video id="player" playsinline controls></video>
-      <div id="titleOverlay" class="channel-title"></div>
-    </div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="remote">
+    <button id="chDown">CH ▼</button>
+    <button id="chUp">CH ▲</button>
+    <button id="muteBtn">MUTE</button>
+    <button id="surfBtn">AUTO-SURF 15s</button>
   </div>
-  <div id="clock" class="clock">--:--:--</div>
-  <div class="channels" id="channelButtons"></div>
-  <div id="status" class="status">Loading channels...</div>
-
+  <div class="guide"><div class="guide-grid" id="guide"></div></div>
+</div>
 <script>
 const CHANNELS_JSON_URL = "{CHANNELS_JSON_URL}";
 const video = document.getElementById('player');
-const titleOverlay = document.getElementById('titleOverlay');
+const overlay = document.getElementById('overlay');
 const clockEl = document.getElementById('clock');
-const buttonsContainer = document.getElementById('channelButtons');
-const statusEl = document.getElementById('status');
-let titleTimeout = null;
-let currentIndex = -1;
-let channels = [];
+const canvas = document.getElementById('staticCanvas');
+const ctx = canvas.getContext('2d');
+let channels = [], currentCh = 0, muted = false, surfTimer = null, titleTimeout = null, audioCtx;
 
-function updateClock() {{
-  clockEl.textContent = new Date().toLocaleTimeString([], {{ hour: '2-digit', minute: '2-digit', second: '2-digit' }});
+function updateClock() {{ clockEl.textContent = new Date().toLocaleTimeString(); }}
+setInterval(updateClock, 1000); updateClock();
+
+function playStatic() {{
+  canvas.style.display = 'block';
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  const id = setInterval(() => {{
+    const img = ctx.createImageData(canvas.width, canvas.height);
+    for (let i = 0; i < img.data.length; i += 4) {{
+      const v = Math.random() * 255;
+      img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255;
+    }}
+    ctx.putImageData(img, 0, 0);
+  }}, 50);
+  setTimeout(() => {{ clearInterval(id); canvas.style.display = 'none'; }}, 350);
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
+  const out = buf.getChannelData(0);
+  for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination); src.start();
 }}
-setInterval(updateClock, 1000);
-updateClock();
 
-function showTitle(title) {{
-  titleOverlay.textContent = title;
-  titleOverlay.classList.add('visible');
+function showTitle(text) {{
+  overlay.textContent = text; overlay.classList.add('show');
   clearTimeout(titleTimeout);
-  titleTimeout = setTimeout(() => titleOverlay.classList.remove('visible'), 15000);
+  titleTimeout = setTimeout(() => overlay.classList.remove('show'), 4000);
 }}
 
-function activateChannel(index) {{
-  if (index === currentIndex) return;
-  currentIndex = index;
-  const ch = channels[index];
-  video.src = ch.src;
-  video.load();
+function getTotalDuration(ch) {{ return ch.playlist.reduce((s, v) => s + (v.duration || 600), 0); }}
+
+function syncToClock(ch) {{
+  const total = getTotalDuration(ch);
+  const offset = (Date.now() / 1000) % total;
+  let acc = 0;
+  for (let i = 0; i < ch.playlist.length; i++) {{
+    const d = ch.playlist[i].duration || 600;
+    if (acc + d > offset) return {{ index: i, time: offset - acc }};
+    acc += d;
+  }}
+  return {{ index: 0, time: 0 }};
+}}
+
+function loadChannel(n) {{
+  if (n < 0 || n >= channels.length) return;
+  currentCh = n;
+  playStatic();
+  const ch = channels[n];
+  showTitle(`You're watching ${{ch.name}}`);
+  const {{ index, time }} = syncToClock(ch);
+  playItem(ch, index, time);
+  document.querySelectorAll('.ch-cell').forEach((c, i) => c.classList.toggle('active', i === n));
+}}
+
+function playItem(ch, idx, seek = 0) {{
+  if (idx >= ch.playlist.length) idx = 0;
+  const item = ch.playlist[idx];
+  video.src = item.url;
+  video.currentTime = seek;
   video.play().catch(() => {{}});
-  showTitle(ch.title);
-  document.querySelectorAll('.ch-btn').forEach((btn, i) => btn.classList.toggle('active', i === index));
+  video.onended = () => playItem(ch, idx + 1);
+  video.onerror = () => playItem(ch, idx + 1);  // automatic failover
 }}
 
-function buildButtons() {{
-  buttonsContainer.innerHTML = '';
-  channels.forEach((ch, i) => {{
-    const btn = document.createElement('button');
-    btn.className = 'ch-btn';
-    btn.textContent = `CH ${{i + 1}}: ${{ch.title}}`;
-    btn.onclick = () => activateChannel(i);
-    buttonsContainer.appendChild(btn);
-  }});
-}}
-
-async function loadChannels() {{
+async function init() {{
   try {{
     const res = await fetch(CHANNELS_JSON_URL);
-    if (!res.ok) throw new Error(`HTTP ${{res.status}}`);
     channels = await res.json();
-    if (!Array.isArray(channels)) throw new Error('JSON is not an array');
-    statusEl.textContent = `Loaded ${{channels.length}} channels`;
-    buildButtons();
-  }} catch (err) {{
-    statusEl.textContent = `Could not load channels.json: ${{err.message}}`;
-    console.error(err);
+  }} catch (e) {{
+    channels = [{{ number: 1, name: "CH 001 – Demo", playlist: [{{ url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", duration: 600 }}] }}];
   }}
+  const guide = document.getElementById('guide');
+  channels.forEach((ch, i) => {{
+    const cell = document.createElement('div');
+    cell.className = 'ch-cell';
+    cell.textContent = `${{String(ch.number).padStart(3,'0')}} ${{ch.name}}`;
+    cell.onclick = () => loadChannel(i);
+    guide.appendChild(cell);
+  }});
+  loadChannel(0);
 }}
 
-loadChannels();
+document.getElementById('chUp').onclick = () => loadChannel((currentCh + 1) % channels.length);
+document.getElementById('chDown').onclick = () => loadChannel((currentCh - 1 + channels.length) % channels.length);
+document.getElementById('muteBtn').onclick = () => {{ muted = !muted; video.muted = muted; }};
+document.getElementById('surfBtn').onclick = () => {{
+  if (surfTimer) {{ clearInterval(surfTimer); surfTimer = null; return; }}
+  surfTimer = setInterval(() => loadChannel((currentCh + 1) % channels.length), 15000);
+}};
+
+let keypad = '';
+document.addEventListener('keydown', e => {{
+  if (e.key === 'ArrowUp') loadChannel((currentCh + 1) % channels.length);
+  if (e.key === 'ArrowDown') loadChannel((currentCh - 1 + channels.length) % channels.length);
+  if (e.key === 'm' || e.key === 'M') {{ muted = !muted; video.muted = muted; }}
+  if (e.key >= '0' && e.key <= '9') {{
+    keypad += e.key;
+    if (keypad.length === 3) {{
+      const num = parseInt(keypad, 10);
+      const idx = channels.findIndex(c => c.number === num);
+      if (idx !== -1) loadChannel(idx);
+      keypad = '';
+    }}
+  }}
+}});
+
+init();
 </script>
 </body>
 </html>
 """
 
-components.html(html_code, height=950, scrolling=True)
-
-st.caption("Channel title shows for 15 seconds after activation. Clock shows your local time. Channels loaded from GitHub.")
-
-Example channels.json (upload to your GitHub repo)
-json
-
-[
-  {
-    "title": "Big Buck Bunny",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-  },
-  {
-    "title": "Elephant Dream",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-  },
-  {
-    "title": "Sintel",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
-  },
-  {
-    "title": "Tears of Steel",
-    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"
-  }
-]
-
-Steps
-
-    Add app.py and channels.json to your public GitHub repo.
-    Update the CHANNELS_JSON_URL line in app.py to the raw URL of your channels.json (click the file on GitHub → Raw → copy the URL).
-    Deploy / redeploy on Streamlit Community Cloud (linked to the same repo).
-
-The player will fetch the JSON at runtime, show the channel title for 15 seconds on activation, and keep the centered local-time clock below the TV. No local computer needed.
-
+components.html(html, height=980, scrolling=True)
+st.caption("Channel title shows briefly. Clock is local time. Channels load from GitHub.")
