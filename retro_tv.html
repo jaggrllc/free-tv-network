@@ -77,14 +77,17 @@ setInterval(updateClock, 1000); updateClock();
 
 function playStatic() {
   const rect = crt.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
+  canvas.width = Math.floor(rect.width);
+  canvas.height = Math.floor(rect.height);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
   canvas.style.display = 'block';
 
   const id = setInterval(() => {
+    if (canvas.width === 0 || canvas.height === 0) return;
     const img = ctx.createImageData(canvas.width, canvas.height);
     for (let i = 0; i < img.data.length; i += 4) {
-      const v = Math.random() * 255;
+      const v = Math.random() * 255 | 0;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
       img.data[i + 3] = 255;
     }
