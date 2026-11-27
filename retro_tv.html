@@ -15,7 +15,16 @@ body { margin: 0; background: #111; color: #eee; font-family: 'Courier New', mon
   max-width: none; aspect-ratio: auto; border-radius: 0; z-index: 9999;
 }
 video { width: 100%; height: 100%; object-fit: contain; }
-#staticCanvas { position: absolute; inset: 0; pointer-events: none; display: none; }
+#staticCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: none;
+  z-index: 5;
+}
 .overlay { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.8); padding: 8px 20px; border-radius: 6px; font-size: 1.2rem; opacity: 0; transition: opacity .4s; z-index: 10; }
 .overlay.show { opacity: 1; }
 .clock { margin-top: 8px; font-size: 1.5rem; color: var(--crt); text-shadow: 0 0 8px var(--crt); }
@@ -46,7 +55,7 @@ button:hover { background: #0a7; }
 </div>
 
 <script>
-const CHANNELS_JSON_URL = "https://raw.githubusercontent.com/jaggrllc/free-tv-network/main/channels.json";
+const CHANNELS_JSON_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json";
 const video = document.getElementById('player');
 const overlay = document.getElementById('overlay');
 const clockEl = document.getElementById('clock');
@@ -56,7 +65,6 @@ const ctx = canvas.getContext('2d');
 let channels = [], currentCh = 0, muted = false, surfTimer = null, titleTimeout = null, audioCtx;
 let isMaximized = false, lastTap = 0;
 
-// Hidden preloader for next video
 const nextVideo = document.createElement('video');
 nextVideo.preload = 'auto';
 nextVideo.muted = true;
@@ -68,22 +76,34 @@ function updateClock() { clockEl.textContent = new Date().toLocaleTimeString(); 
 setInterval(updateClock, 1000); updateClock();
 
 function playStatic() {
+  const rect = crt.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
   canvas.style.display = 'block';
-  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+
   const id = setInterval(() => {
     const img = ctx.createImageData(canvas.width, canvas.height);
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() * 255;
-      img.data[i] = img.data[i+1] = img.data[i+2] = v; img.data[i+3] = 255;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+      img.data[i + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
-  }, 50);
-  setTimeout(() => { clearInterval(id); canvas.style.display = 'none'; }, 350);
+  }, 40);
+
+  setTimeout(() => {
+    clearInterval(id);
+    canvas.style.display = 'none';
+  }, 350);
+
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.35, audioCtx.sampleRate);
   const out = buf.getChannelData(0);
   for (let i = 0; i < out.length; i++) out[i] = Math.random() * 2 - 1;
-  const src = audioCtx.createBufferSource(); src.buffer = buf; src.connect(audioCtx.destination); src.start();
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audioCtx.destination);
+  src.start();
 }
 
 function showTitle(text) {
@@ -185,7 +205,6 @@ document.addEventListener('webkitfullscreenchange', () => {
   if (!document.webkitFullscreenElement) { crt.classList.remove('maximized'); isMaximized = false; }
 });
 
-// Buffering indicator
 video.addEventListener('waiting', () => {
   overlay.textContent = 'Buffering...';
   overlay.classList.add('show');
