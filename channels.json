@@ -1,34 +1,14 @@
 [
   {
-    "channel_number": 1,
-    "name": "Totally Radical Zone",
-    "topic": "public domain movies",
-    "videos": [
-      {
-        "url": "https://archive.org/download/Night.Of.The.Living.Dead_1080p/NightOfTheLivingDead_512kb.mp4",
-        "duration": 5760,
-        "title": "Night of the Living Dead"
-      }
-    ],
-    "commercials": [
-      {
-          "url": "https://archive.org/01-public-access-news-report/01 Public Access News Report.ia.mp4",
-          "duration": 183,
-          "title": "Public Access TV News Report - The New York TV Archive - Part 2 (2022)"
-      }
-    ]
+    "title": "Big Buck Bunny",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
   },
   {
-    "channel_number": 2,
-    "name": "Groovy Cartoon Hour",
-    "topic": "classic cartoons",
-    "videos": [
-      {
-        "url": "https://archive.org/download/popeye_popeye_for_president/popeye_popeye_for_president.mp4",
-        "duration": 450,
-        "title": "Popeye"
-      }
-    ],
-    "commercials": []
+    "title": "Elephant Dream",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+  },
+  {
+    "title": "Sintel",
+    "src": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
   }
 ]
