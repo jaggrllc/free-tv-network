@@ -1,1 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RETRO CABLE TV</title>
+<style>
+:root { --crt: #0a0; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #111; color: #eee; font-family: 'Courier New', monospace; }
+.tv-bezel { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+.crt { width: min(95vw, 1100px); aspect-ratio: 16/9; background: #000; border-radius: 18px; box-shadow: inset 0 0 60px #000, 0 0 30px #000; position: relative; overflow: hidden; }
+.crt.maximized { position: fixed; top: 0; left: 0; width: 100vw !important; height: 100vh !important; max-width: none; aspect-ratio: auto; border-radius: 0; z-index: 9999; }
+video { width: 100%; height: 100%; object-fit: contain; }
+#staticCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: none; z-index: 5; }
+.overlay { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.8); padding: 8px 20px; border-radius: 6px; font-size: 1.2rem; opacity: 0; transition: opacity .4s; z-index: 10; }
+.overlay.show { opacity: 1; }
+.clock { margin-top: 8px; font-size: 1.5rem; color: var(--crt); text-shadow: 0 0 8px var(--crt); }
+.remote { display: flex; gap: 10px; margin: 8px 0; flex-wrap: wrap; justify-content: center; }
+button { background: #333; color: #fff; border: 2px solid #555; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; }
+button:hover { background: #0a7; }
+#startBtn { background: #0a7; font-weight: bold; }
+.guide { width: 100%; max-height: 25vh; overflow-y: auto; background: #000c; border-top: 2px solid #333; margin-top: 6px; }
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px; padding: 6px; }
+.ch-cell { background: #222; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.ch-cell:hover, .ch-cell.active { background: #0a7; }
+</style>
+</head>
+<body>
+<div class="tv-bezel">
+  <div class="crt" id="crt">
+    <video id="player" playsinline preload="auto"></video>
+    <canvas id="staticCanvas"></canvas>
+    <div id="overlay" class="overlay"></div>
+  </div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="remote">
+    <button id="chDown">CH ▼</button>
+    <button id="chUp">CH ▲</button>
+    <button id="muteBtn">MUTE</button>
+    <button id="surfBtn">AUTO-SURF 15s</button>
+    <button id="fsBtn">FULL SCREEN</button>
+    <button id="startBtn">CLICK TO START</button>
+  </div>
+  <div class="guide"><div class="guide-grid" id="guide"></div></div>
+</div>
 
+<script>
+// ←←← YOUR RAW GITHUB URL HERE ←←←
+const CHANNELS_JSON_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json";
+
+const video = document.getElementById('player');
+const overlay = document.getElementById('overlay');
+const clockEl = document.getElementById('clock');
+const crt = document.getElementById('crt');
+const canvas = document.getElementById('staticCanvas');
+const ctx = canvas.getContext('2d');
+let channels = [], currentCh = 0, muted = false, surfTimer = null, titleTimeout = null;
+let isMaximized = false;
+
+function updateClock() { clockEl.textContent = new Date().toLocaleTimeString(); }
+setInterval(updateClock, 1000); updateClock();
+
+function playStatic() {
+  const rect = crt.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width);
+  canvas.height = Math.floor(rect.height);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  canvas.style.display = 'block';
+  const id = setInterval(() => {
+    if (canvas.width === 0 || canvas.height === 0) return;
+    const img = ctx.createImageData(canvas.width, canvas.height);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      img.data[i] = img.data[i+1] = img.data[i+2] = v;
+      img.data[i+3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, 40);
+  setTimeout(() => { clearInterval(id); canvas.style.display = 'none'; }, 350);
+}
+
+function showTitle(text) {
+  overlay.textContent = text; overlay.classList.add('show');
+  clearTimeout(titleTimeout);
+  titleTimeout = setTimeout(() => overlay.classList.remove('show'), 4000);
+}
+
+function playItem(ch, idx) {
+  const playlist = ch.playlist || ch.videos || [];
+  if (idx >= playlist.length) idx = 0;
+  if (idx < 0) idx = 0;
+
+  const item = playlist[idx];
+  if (!item || !item.url) {
+    playItem(ch, idx + 1);
+    return;
+  }
+
+  if (window.playTimeout) clearTimeout(window.playTimeout);
+
+  video.muted = true;
+  video.src = item.url;
+  showTitle(item.title || ch.name || 'Loading...');
+
+  let started = false;
+
+  const onPlaying = () => {
+    started = true;
+    clearTimeout(window.playTimeout);
+    setTimeout(() => { video.muted = muted; }, 400);
+    video.removeEventListener('playing', onPlaying);
+  };
+  video.addEventListener('playing', onPlaying);
+
+  window.playTimeout = setTimeout(() => {
+    if (!started) {
+      video.src = '';
+      playItem(ch, idx + 1);
+    }
+  }, 12000);
+
+  video.onerror = () => {
+    clearTimeout(window.playTimeout);
+    playItem(ch, idx + 1);
+  };
+
+  video.onended = () => {
+    clearTimeout(window.playTimeout);
+    playItem(ch, idx + 1);
+  };
+
+  video.play().catch(() => {
+    clearTimeout(window.playTimeout);
+    playItem(ch, idx + 1);
+  });
+}
+
+function loadChannel(n) {
+  if (n < 0 || n >= channels.length) return;
+  currentCh = n;
+  playStatic();
+  const ch = channels[n];
+  showTitle(ch.name || `Channel ${n+1}`);
+  playItem(ch, 0);
+  document.querySelectorAll('.ch-cell').forEach((c, i) => c.classList.toggle('active', i === n));
+}
+
+function toggleMaximize() {
+  isMaximized = !isMaximized;
+  const fsBtn = document.getElementById('fsBtn');
+  if (isMaximized) {
+    crt.classList.add('maximized');
+    fsBtn.textContent = 'EXIT FULL SCREEN';
+    if (crt.requestFullscreen) crt.requestFullscreen().catch(()=>{});
+  } else {
+    crt.classList.remove('maximized');
+    fsBtn.textContent = 'FULL SCREEN';
+    if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+  }
+}
+document.getElementById('fsBtn').onclick = toggleMaximize;
+
+document.getElementById('startBtn').onclick = () => {
+  document.getElementById('startBtn').style.display = 'none';
+  if (channels.length) loadChannel(0);
+};
+
+async function init() {
+  try {
+    const res = await fetch(CHANNELS_JSON_URL);
+    channels = await res.json();
+  } catch (e) {
+    console.error(e);
+    channels = [];
+  }
+  const guide = document.getElementById('guide');
+  channels.forEach((ch, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ch-cell';
+    const num = ch.number ?? ch.channel_number ?? (i + 1);
+    cell.textContent = `${String(num).padStart(3,'0')} ${ch.name}`;
+    cell.onclick = () => loadChannel(i);
+    guide.appendChild(cell);
+  });
+}
+
+document.getElementById('chUp').onclick = () => loadChannel((currentCh + 1) % channels.length);
+document.getElementById('chDown').onclick = () => loadChannel((currentCh - 1 + channels.length) % channels.length);
+document.getElementById('muteBtn').onclick = () => { muted = !muted; video.muted = muted; };
+document.getElementById('surfBtn').onclick = () => {
+  if (surfTimer) { clearInterval(surfTimer); surfTimer = null; return; }
+  surfTimer = setInterval(() => loadChannel((currentCh + 1) % channels.length), 15000);
+};
+
+init();
+</script>
+</body>
+</html>
