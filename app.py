@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Retro Cable TV", layout="wide")
 
 # Update this to your raw GitHub URL for channels.json
-CHANNELS_JSON_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json"
+CHANNELS_JSON_URL = "https://raw.githubusercontent.com/jaggrllc/free-tv-network/main/channels.json"
 
 html = f"""
 <!DOCTYPE html>
