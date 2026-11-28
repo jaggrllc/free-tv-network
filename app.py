@@ -4,7 +4,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Retro Cable TV", layout="wide")
 
 # Update this to your raw GitHub URL for channels.json
-CHANNELS_JSON_URL = "https://raw.githubusercontent.com/jaggrllc/free-tv-network/main/channels.json"
+CHANNELS_JSON_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json"
 
 html = f"""
 <!DOCTYPE html>
@@ -240,7 +240,8 @@ async function init() {{
   channels.forEach((ch, i) => {{
     const cell = document.createElement('div');
     cell.className = 'ch-cell';
-    cell.textContent = `${{String(ch.channel_number).padStart(3,'0')}} ${{ch.name}}`;
+    const num = ch.channel_number ?? ch.number ?? (i + 1);
+    cell.textContent = `${{String(num).padStart(3,'0')}} ${{ch.name}}`;
     cell.onclick = () => loadChannel(i);
     guide.appendChild(cell);
   }});
@@ -264,7 +265,7 @@ document.addEventListener('keydown', e => {{
     keypad += e.key;
     if (keypad.length === 3) {{
       const num = parseInt(keypad, 10);
-      const idx = channels.findIndex(c => c.channel_number === num);
+      const idx = channels.findIndex(c => (c.channel_number ?? c.number) === num);
       if (idx !== -1) loadChannel(idx);
       keypad = '';
     }}
@@ -278,4 +279,4 @@ init();
 """
 
 components.html(html, height=980, scrolling=True)
-st.caption("Double-click removed. Use the FULL SCREEN button. Static snow covers the full screen.")
+st.caption("Channel numbers now display correctly (supports both channel_number and number fields).")
