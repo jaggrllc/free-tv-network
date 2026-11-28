@@ -50,6 +50,7 @@ button:hover { background: #0a7; }
     <button id="chUp">CH ▲</button>
     <button id="muteBtn">MUTE</button>
     <button id="surfBtn">AUTO-SURF 15s</button>
+    <button id="fsBtn">FULL SCREEN</button>
   </div>
   <div class="guide"><div class="guide-grid" id="guide"></div></div>
 </div>
@@ -63,7 +64,7 @@ const crt = document.getElementById('crt');
 const canvas = document.getElementById('staticCanvas');
 const ctx = canvas.getContext('2d');
 let channels = [], currentCh = 0, muted = false, surfTimer = null, titleTimeout = null, audioCtx;
-let isMaximized = false, lastTap = 0;
+let isMaximized = false;
 
 const nextVideo = document.createElement('video');
 nextVideo.preload = 'auto';
@@ -180,32 +181,35 @@ function loadChannel(n) {
 
 function toggleMaximize() {
   isMaximized = !isMaximized;
+  const fsBtn = document.getElementById('fsBtn');
   if (isMaximized) {
     crt.classList.add('maximized');
+    fsBtn.textContent = 'EXIT FULL SCREEN';
     if (crt.requestFullscreen) crt.requestFullscreen().catch(() => {});
     else if (crt.webkitRequestFullscreen) crt.webkitRequestFullscreen();
   } else {
     crt.classList.remove('maximized');
+    fsBtn.textContent = 'FULL SCREEN';
     if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
 }
 
-crt.addEventListener('dblclick', (e) => { e.preventDefault(); toggleMaximize(); });
-crt.addEventListener('touchstart', (e) => {
-  const now = Date.now();
-  if (now - lastTap < 300 && now - lastTap > 0) {
-    e.preventDefault();
-    toggleMaximize();
-  }
-  lastTap = now;
-}, { passive: false });
+document.getElementById('fsBtn').onclick = toggleMaximize;
 
 document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement) { crt.classList.remove('maximized'); isMaximized = false; }
+  if (!document.fullscreenElement) {
+    crt.classList.remove('maximized');
+    isMaximized = false;
+    document.getElementById('fsBtn').textContent = 'FULL SCREEN';
+  }
 });
 document.addEventListener('webkitfullscreenchange', () => {
-  if (!document.webkitFullscreenElement) { crt.classList.remove('maximized'); isMaximized = false; }
+  if (!document.webkitFullscreenElement) {
+    crt.classList.remove('maximized');
+    isMaximized = false;
+    document.getElementById('fsBtn').textContent = 'FULL SCREEN';
+  }
 });
 
 video.addEventListener('waiting', () => {
